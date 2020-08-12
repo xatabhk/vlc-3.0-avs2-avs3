@@ -39,7 +39,7 @@
 typedef const struct
 {
     char const key[20];
-    char const name[8];
+    char const name[9];
 
 } demux_mapping;
 
@@ -86,6 +86,12 @@ static const char* DemuxNameFromExtension( char const* ext,
         { "asf",  "asf" },
         { "au",   "au" },
         { "avi",  "avi" },
+
+        { "avs",  "avformat" },
+        { "avs2", "avformat" },
+        { "avs3", "avformat" },
+        { "cavs", "avformat" },
+
         { "drc",  "dirac" },
         { "dv",   "dv" },
         { "flac", "flac" },
@@ -256,6 +262,10 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
 
             if( psz_ext )
                 psz_module = DemuxNameFromExtension( psz_ext + 1, b_preparsing );
+
+		//zheng
+		msg_Dbg( p_obj, "demux.c: psz_module='%s'", psz_module);
+
         }
 
         if( psz_module == NULL )

@@ -27,6 +27,8 @@ FFMPEGCONF = \
 	--disable-encoder=vorbis \
 	--disable-decoder=opus \
 	--enable-libgsm \
+	--enable-gpl \
+	--enable-libuavs3d \
 	--disable-debug \
 	--disable-avdevice \
 	--disable-devices \

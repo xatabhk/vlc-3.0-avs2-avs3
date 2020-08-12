@@ -2873,6 +2873,17 @@ AC_CHECK_HEADERS(libbpg.h, [
 ])
 
 dnl
+dnl  AVS2 decoder module
+dnl
+AC_ARG_ENABLE(avs2,
+  [  --enable-avs2           AVS2 support (default disabled)])
+AS_IF([test "${enable_avs2}" != "no"], [
+AC_CHECK_HEADERS(davs2.h, [
+  VLC_ADD_PLUGIN([avs2])
+  ])
+])
+
+dnl
 dnl H262 encoder plugin (lib262)
 dnl
 AC_ARG_ENABLE(x262,
