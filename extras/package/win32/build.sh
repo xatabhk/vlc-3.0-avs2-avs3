@@ -28,15 +28,18 @@ OPTIONS:
    -s            Interactive shell (get correct environment variables for build)
    -b <url>      Enable breakpad support and send crash reports to this URL
    -d            Create PDB files during the build
+   -D <win_path> Create PDB files during the build, map the VLC sources to <win_path>
+                 e.g.: -D c:/sources/vlc
    -x            Add extra checks when compiling
    -u            Use the Universal C Runtime (instead of msvcrt)
    -w            Restrict to Windows Store APIs
    -z            Build without GUI (libvlc only)
+   -o <path>     Install the built binaries in the absolute path
 EOF
 }
 
 ARCH="x86_64"
-while getopts "hra:pcli:sb:dxuwz" OPTION
+while getopts "hra:pcli:sb:dD:xuwzo:" OPTION
 do
      case $OPTION in
          h)
@@ -71,6 +74,10 @@ do
          d)
              WITH_PDB="yes"
          ;;
+         D)
+             WITH_PDB="yes"
+             PDB_MAP=$OPTARG
+         ;;
          x)
              EXTRA_CHECKS="yes"
          ;;
@@ -82,6 +89,9 @@ do
          ;;
          z)
              DISABLEGUI="yes"
+         ;;
+         o)
+             INSTALL_PATH=$OPTARG
          ;;
      esac
 done
@@ -113,6 +123,7 @@ esac
 #####
 
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
+VLC_ROOT_PATH="$( cd "${SCRIPT_PATH}/../../.." ; pwd -P )"
 
 JOBS=`getconf _NPROCESSORS_ONLN 2>&1`
 TRIPLET=$ARCH-w64-mingw32
@@ -139,7 +150,7 @@ if [ "$COMPILING_WITH_CLANG" -gt 0 ] && [ ! -d "libtool" ]; then
 fi
 # bootstrap only if needed in interactive mode
 if [ "$INTERACTIVE" != "yes" ] || [ ! -f ./Makefile ]; then
-    NEEDED="$FORCED_TOOLS" ${SCRIPT_PATH}/../../tools/bootstrap
+    NEEDED="$FORCED_TOOLS" ${VLC_ROOT_PATH}/extras/tools/bootstrap
 fi
 make -j$JOBS
 cd ../../
@@ -234,9 +245,9 @@ if [ ! -z "$BUILD_UCRT" ]; then
     # the values are not passed to the makefiles/configures
     export LDFLAGS
     export CPPFLAGS
-else
-    # The current minimum for VLC is Windows 7 and to use the regular msvcrt
-    CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0601 -DWINVER=0x0601 -D__MSVCRT_VERSION__=0x700"
+# else
+#     # The current minimum for VLC is Windows 7 and to use the regular msvcrt
+#     CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0601 -DWINVER=0x0601 -D__MSVCRT_VERSION__=0x700"
 fi
 CFLAGS="$CPPFLAGS $CFLAGS"
 CXXFLAGS="$CPPFLAGS $CXXFLAGS"
@@ -247,6 +258,10 @@ echo $PATH
 mkdir -p contrib/contrib-$SHORTARCH && cd contrib/contrib-$SHORTARCH
 if [ ! -z "$WITH_PDB" ]; then
     CONTRIBFLAGS="$CONTRIBFLAGS --enable-pdb"
+    if [ ! -z "$PDB_MAP" ]; then
+        CFLAGS="$CFLAGS -fdebug-prefix-map='$VLC_ROOT_PATH'='$PDB_MAP'"
+        CXXFLAGS="$CXXFLAGS -fdebug-prefix-map='$VLC_ROOT_PATH'='$PDB_MAP'"
+    fi
 fi
 if [ ! -z "$BREAKPAD" ]; then
      CONTRIBFLAGS="$CONTRIBFLAGS --enable-breakpad"
@@ -261,7 +276,11 @@ if [ ! -z "$WINSTORE" ]; then
     # we don't use a special toolchain to trigger the detection in contribs so force it manually
     export HAVE_WINSTORE=1
 fi
-${SCRIPT_PATH}/../../../contrib/bootstrap --host=$TRIPLET --prefix=../$CONTRIB_PREFIX $CONTRIBFLAGS
+
+export CFLAGS
+export CXXFLAGS
+
+${VLC_ROOT_PATH}/contrib/bootstrap --host=$TRIPLET --prefix=../$CONTRIB_PREFIX $CONTRIBFLAGS
 
 # Rebuild the contribs or use the prebuilt ones
 if [ "$PREBUILT" != "yes" ]; then
@@ -282,7 +301,7 @@ cd ../..
 
 info "Bootstrapping"
 
-${SCRIPT_PATH}/../../../bootstrap
+${VLC_ROOT_PATH}/bootstrap
 
 info "Configuring VLC"
 if [ -z "$PKG_CONFIG" ]; then
@@ -337,6 +356,9 @@ if [ ! -z "$WINSTORE" ]; then
 else
     CONFIGFLAGS="$CONFIGFLAGS --enable-dvdread --enable-caca"
 fi
+if [ ! -z "$INSTALL_PATH" ]; then
+    CONFIGFLAGS="$CONFIGFLAGS --prefix=$INSTALL_PATH"
+fi
 
 ${SCRIPT_PATH}/configure.sh --host=$TRIPLET --with-contrib=../contrib/$CONTRIB_PREFIX $CONFIGFLAGS
 
@@ -350,4 +372,6 @@ make package-win32
 elif [ "$INSTALLER" = "u" ]; then
 make package-win32-release
 sha512sum vlc-*-release.7z
+elif [ ! -z "$INSTALL_PATH" ]; then
+make package-win-install
 fi
